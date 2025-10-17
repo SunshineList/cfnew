@@ -113,10 +113,10 @@ async function detectWorkerRegion(request) {
             }
         }
         
-        return 'HK';
+        return 'JP';
         
     } catch (error) {
-        return 'HK';
+        return 'JP';
     }
 }
 
