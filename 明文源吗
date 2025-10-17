@@ -9,6 +9,7 @@ let customPreferredDomains = [];
 let enableSocksDowngrade = false;
 let disablePort80 = false;
 let disablePreferred = false;
+let maxRandomNodes = 0; // 0表示不限制，大于0表示随机选择n个节点
 
 let enableRegionMatching = true;
 let currentWorkerRegion = '';
@@ -17,7 +18,6 @@ const regionMapping = {
     'US': ['🇺🇸 美国', 'US', 'United States'],
     'SG': ['🇸🇬 新加坡', 'SG', 'Singapore'],
     'JP': ['🇯🇵 日本', 'JP', 'Japan'],
-    'HK': ['🇭🇰 香港', 'HK', 'Hong Kong'],
     'KR': ['🇰🇷 韩国', 'KR', 'South Korea'],
     'DE': ['🇩🇪 德国', 'DE', 'Germany'],
     'SE': ['🇸🇪 瑞典', 'SE', 'Sweden'],
@@ -34,7 +34,6 @@ let backupIPs = [
     { domain: 'ProxyIP.US.CMLiussss.net', region: 'US', regionCode: 'US', port: 443 },
     { domain: 'ProxyIP.SG.CMLiussss.net', region: 'SG', regionCode: 'SG', port: 443 },
     { domain: 'ProxyIP.JP.CMLiussss.net', region: 'JP', regionCode: 'JP', port: 443 },
-    { domain: 'ProxyIP.HK.CMLiussss.net', region: 'HK', regionCode: 'HK', port: 443 },
     { domain: 'ProxyIP.KR.CMLiussss.net', region: 'KR', regionCode: 'KR', port: 443 },
     { domain: 'ProxyIP.DE.CMLiussss.net', region: 'DE', regionCode: 'DE', port: 443 },
     { domain: 'ProxyIP.SE.CMLiussss.net', region: 'SE', regionCode: 'SE', port: 443 },
@@ -101,9 +100,9 @@ async function detectWorkerRegion(request) {
         
         if (cfCountry) {
             const countryToRegion = {
-                'US': 'US', 'SG': 'SG', 'JP': 'JP', 'HK': 'HK', 'KR': 'KR',
+                'US': 'US', 'SG': 'SG', 'JP': 'JP', 'KR': 'KR',
                 'DE': 'DE', 'SE': 'SE', 'NL': 'NL', 'FI': 'FI', 'GB': 'GB',
-                'CN': 'HK', 'TW': 'HK', 'AU': 'SG', 'CA': 'US',
+                'CN': 'SG', 'TW': 'JP', 'AU': 'SG', 'CA': 'US',
                 'FR': 'DE', 'IT': 'DE', 'ES': 'DE', 'CH': 'DE',
                 'AT': 'DE', 'BE': 'NL', 'DK': 'SE', 'NO': 'SE', 'IE': 'GB'
             };
@@ -163,11 +162,10 @@ async function getBestBackupIP(workerRegion = '') {
 
 function getNearbyRegions(region) {
     const nearbyMap = {
-        'US': ['SG', 'JP', 'HK', 'KR'], // 美国 -> 亚太地区
-        'SG': ['JP', 'HK', 'KR', 'US'], // 新加坡 -> 亚太地区
-        'JP': ['SG', 'HK', 'KR', 'US'], // 日本 -> 亚太地区
-        'HK': ['SG', 'JP', 'KR', 'US'], // 香港 -> 亚太地区
-        'KR': ['JP', 'HK', 'SG', 'US'], // 韩国 -> 亚太地区
+        'US': ['SG', 'JP', 'KR'], // 美国 -> 亚太地区
+        'SG': ['JP', 'KR', 'US'], // 新加坡 -> 亚太地区
+        'JP': ['SG', 'KR', 'US'], // 日本 -> 亚太地区
+        'KR': ['JP', 'SG', 'US'], // 韩国 -> 亚太地区
         'DE': ['NL', 'GB', 'SE', 'FI'], // 德国 -> 欧洲地区
         'SE': ['DE', 'NL', 'FI', 'GB'], // 瑞典 -> 北欧地区
         'NL': ['DE', 'GB', 'SE', 'FI'], // 荷兰 -> 西欧地区
@@ -180,7 +178,7 @@ function getNearbyRegions(region) {
 
 function getAllRegionsByPriority(region) {
     const nearbyRegions = getNearbyRegions(region);
-    const allRegions = ['US', 'SG', 'JP', 'HK', 'KR', 'DE', 'SE', 'NL', 'FI', 'GB'];
+    const allRegions = ['US', 'SG', 'JP', 'KR', 'DE', 'SE', 'NL', 'FI', 'GB'];
     
     return [region, ...nearbyRegions, ...allRegions.filter(r => r !== region && !nearbyRegions.includes(r))];
 }
@@ -226,6 +224,23 @@ function parseAddressAndPort(input) {
     }
     
     return { address: input, port: null };
+}
+
+function shuffleArray(array) {
+    const arr = [...array];
+    for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+}
+
+function randomSelectNodes(linksArray, maxCount) {
+    if (maxCount <= 0 || linksArray.length <= maxCount) {
+        return linksArray;
+    }
+    const shuffled = shuffleArray(linksArray);
+    return shuffled.slice(0, maxCount);
 }
 
 export default {
@@ -317,6 +332,14 @@ export default {
 			const yxbyControl = env.yxby || env.YXBY;
 			if (yxbyControl && yxbyControl.toLowerCase() === 'yes') {
 				disablePreferred = true;
+			}
+
+			const maxNodesControl = env.maxnodes || env.MAXNODES;
+			if (maxNodesControl) {
+				const parsedMaxNodes = parseInt(maxNodesControl, 10);
+				if (!isNaN(parsedMaxNodes) && parsedMaxNodes > 0) {
+					maxRandomNodes = parsedMaxNodes;
+				}
 			}
 
 			const url = new URL(request.url);
@@ -787,36 +810,42 @@ async function handleSubscriptionRequest(request, user, url = null) {
         finalLinks.push(errorLink);
     }
 
+    // 应用随机节点选择
+    let selectedLinks = finalLinks;
+    if (maxRandomNodes > 0 && finalLinks.length > maxRandomNodes) {
+        selectedLinks = randomSelectNodes(finalLinks, maxRandomNodes);
+    }
+
     let subscriptionContent;
     let contentType = 'text/plain; charset=utf-8';
     
     switch (target.toLowerCase()) {
         case atob('Y2xhc2g='):
         case atob('Y2xhc2hy'):
-            subscriptionContent = await generateClashConfig(finalLinks);
+            subscriptionContent = await generateClashConfig(selectedLinks);
             contentType = 'text/yaml; charset=utf-8';
             break;
         case atob('c3VyZ2Uy'):
         case atob('c3VyZ2Uz'):
         case atob('c3VyZ2U0'):
-            subscriptionContent = generateSurgeConfig(finalLinks);
+            subscriptionContent = generateSurgeConfig(selectedLinks);
             break;
         case atob('cXVhbnR1bXVsdA=='):
         case atob('cXVhbnR1bXVsdHg='):
-            subscriptionContent = generateQuantumultConfig(finalLinks);
+            subscriptionContent = generateQuantumultConfig(selectedLinks);
             break;
         case atob('c3M='):
         case atob('c3Ny'):
-            subscriptionContent = generateSSConfig(finalLinks);
+            subscriptionContent = generateSSConfig(selectedLinks);
             break;
         case atob('djJyYXk='):
-            subscriptionContent = generateV2RayConfig(finalLinks);
+            subscriptionContent = generateV2RayConfig(selectedLinks);
             break;
         case atob('bG9vbg=='):
-            subscriptionContent = generateLoonConfig(finalLinks);
+            subscriptionContent = generateLoonConfig(selectedLinks);
             break;
         default:
-            subscriptionContent = btoa(finalLinks.join('\n'));
+            subscriptionContent = btoa(selectedLinks.join('\n'));
     }
     
     return new Response(subscriptionContent, {
@@ -1506,7 +1535,7 @@ async function handleSubscriptionPage(request, user = null) {
                 const regionMatch = document.getElementById('regionMatch');
                 
                 const regionNames = {
-                    'US': '🇺🇸 美国', 'SG': '🇸🇬 新加坡', 'JP': '🇯🇵 日本', 'HK': '🇭🇰 香港',
+                    'US': '🇺🇸 美国', 'SG': '🇸🇬 新加坡', 'JP': '🇯🇵 日本',
                     'KR': '🇰🇷 韩国', 'DE': '🇩🇪 德国', 'SE': '🇸🇪 瑞典', 'NL': '🇳🇱 荷兰',
                     'FI': '🇫🇮 芬兰', 'GB': '🇬🇧 英国'
                 };
@@ -1546,7 +1575,6 @@ async function handleSubscriptionPage(request, user = null) {
                     { domain: 'ProxyIP.US.CMLiussss.net', region: 'US' },
                     { domain: 'ProxyIP.SG.CMLiussss.net', region: 'SG' },
                     { domain: 'ProxyIP.JP.CMLiussss.net', region: 'JP' },
-                    { domain: 'ProxyIP.HK.CMLiussss.net', region: 'HK' },
                     { domain: 'ProxyIP.KR.CMLiussss.net', region: 'KR' },
                     { domain: 'ProxyIP.DE.CMLiussss.net', region: 'DE' },
                     { domain: 'ProxyIP.SE.CMLiussss.net', region: 'SE' },
@@ -1560,11 +1588,10 @@ async function handleSubscriptionPage(request, user = null) {
                 let nearbyRegionAvailable = 0;
                 
                 const nearbyRegions = {
-                    'US': ['SG', 'JP', 'HK', 'KR'],
-                    'SG': ['JP', 'HK', 'KR', 'US'],
-                    'JP': ['SG', 'HK', 'KR', 'US'],
-                    'HK': ['SG', 'JP', 'KR', 'US'],
-                    'KR': ['JP', 'HK', 'SG', 'US'],
+                    'US': ['SG', 'JP', 'KR'],
+                    'SG': ['JP', 'KR', 'US'],
+                    'JP': ['SG', 'KR', 'US'],
+                    'KR': ['JP', 'SG', 'US'],
                     'DE': ['NL', 'GB', 'SE', 'FI'],
                     'SE': ['DE', 'NL', 'FI', 'GB'],
                     'NL': ['DE', 'GB', 'SE', 'FI'],
