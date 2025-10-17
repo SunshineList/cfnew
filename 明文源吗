@@ -831,7 +831,7 @@ function generateLinksFromSource(list, user, workerDomain) {
     const defaultHttpsPorts = [443];
     const defaultHttpPorts = disablePort80 ? [] : [80];
     const links = [];
-    const wsPath = encodeURIComponent('/?ed=2048');
+    const wsPath = '/?ed=2048';
     const proto = atob('dmxlc3M=');
 
     list.forEach(item => {
@@ -1679,7 +1679,7 @@ async function fetchAndParseNewIPs() {
 
 function generateLinksFromNewIPs(list, user, workerDomain) {
     const links = [];
-    const wsPath = encodeURIComponent('/?ed=2048');
+    const wsPath = '/?ed=2048';
     const proto = atob('dmxlc3M=');
     
     list.forEach(item => {
