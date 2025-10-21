@@ -154,6 +154,23 @@ async function setConfigValue(key, value) {
     await saveKVConfig();
 }
 
+function shuffleArray(array) {
+    const arr = [...array];
+    for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+}
+
+function randomSelectNodes(linksArray, maxCount) {
+    if (maxCount <= 0 || linksArray.length <= maxCount) {
+        return linksArray;
+    }
+    const shuffled = shuffleArray(linksArray);
+    return shuffled.slice(0, maxCount);
+}
+
 async function detectWorkerRegion(request) {
     try {
         const cfCountry = request.cf?.country;
